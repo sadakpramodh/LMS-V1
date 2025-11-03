@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     // Fetch all profiles
     const { data: profiles, error: profilesError } = await supabaseClient
       .from('profiles')
-      .select('id, full_name');
+      .select('id, full_name, is_enabled');
 
     if (profilesError) {
       console.error('Profiles fetch error:', profilesError);
@@ -102,6 +102,8 @@ Deno.serve(async (req) => {
             id: profile.id,
             email: authUser?.email || 'unknown',
             full_name: profile.full_name || undefined,
+            is_enabled: profile.is_enabled ?? false,
+            last_sign_in_at: authUser?.last_sign_in_at ?? null,
             permissions: userPerms,
           };
         } catch (error) {

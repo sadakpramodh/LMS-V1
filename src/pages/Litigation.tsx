@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Plus, Search, Filter, Calendar, FileText, Upload, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Calendar, FileText, Upload, Trash2, Info } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
   useLitigationCases,
@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function Litigation() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -75,23 +76,52 @@ export default function Litigation() {
     return String(value);
   };
 
+  const toISODate = (year: number, month: number, day: number): string | null => {
+    const isoDate = new Date(Date.UTC(year, month - 1, day));
+    if (Number.isNaN(isoDate.getTime())) {
+      return null;
+    }
+    return isoDate.toISOString().split("T")[0];
+  };
+
   const parseDateValue = (value: unknown): string | null => {
     if (value === null || value === undefined || value === "") {
       return null;
     }
 
-    const dateValue =
-      value instanceof Date
-        ? value
-        : typeof value === "string" || typeof value === "number"
-          ? new Date(value)
-          : null;
-
-    if (!dateValue || Number.isNaN(dateValue.getTime())) {
-      return null;
+    if (value instanceof Date) {
+      return toISODate(value.getFullYear(), value.getMonth() + 1, value.getDate());
     }
 
-    return dateValue.toISOString().split("T")[0];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const excelDate = XLSX.SSF?.parse_date_code?.(value);
+      if (excelDate) {
+        return toISODate(excelDate.y, excelDate.m, excelDate.d);
+      }
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed === "") {
+        return null;
+      }
+
+      const ddMmYyyyMatch = trimmed.match(/^([0-3]?\d)[-\/](0?\d|1[0-2])[-\/](\d{4})$/);
+      if (ddMmYyyyMatch) {
+        const [, dd, mm, yyyy] = ddMmYyyyMatch;
+        const day = Number.parseInt(dd, 10);
+        const month = Number.parseInt(mm, 10);
+        const year = Number.parseInt(yyyy, 10);
+        return toISODate(year, month, day);
+      }
+
+      const isoLike = new Date(trimmed);
+      if (!Number.isNaN(isoLike.getTime())) {
+        return toISODate(isoLike.getFullYear(), isoLike.getMonth() + 1, isoLike.getDate());
+      }
+    }
+
+    return null;
   };
 
   const parseNumberValue = (value: unknown): number | null => {
@@ -128,9 +158,21 @@ export default function Litigation() {
     }
 
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      
+      const extension = file.name.toLowerCase();
+      const allowedExtensions = [".xlsx", ".xls", ".csv"];
+
+      if (!allowedExtensions.some((ending) => extension.endsWith(ending))) {
+        toast.error("Unsupported file type. Please upload an Excel or CSV file.");
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+
+      const workbook = extension.endsWith(".csv")
+        ? XLSX.read(await file.text(), { type: "string" })
+        : XLSX.read(await file.arrayBuffer());
+
       // Look for Sheet1 specifically
       const sheetName = workbook.SheetNames.includes("Sheet1") ? "Sheet1" : workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
@@ -298,7 +340,7 @@ export default function Litigation() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 onChange={handleFileUpload}
                 className="hidden"
               />
@@ -308,7 +350,7 @@ export default function Litigation() {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="h-4 w-4" />
-                Upload Excel
+                Bulk Upload
               </Button>
             </>
           )}
@@ -318,6 +360,18 @@ export default function Litigation() {
           </Button>
         </div>
       </div>
+
+      {hasPermission("upload_excel_litigation") && (
+        <Alert className="shadow-[var(--shadow-card)] border-dashed">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Bulk upload tips</AlertTitle>
+          <AlertDescription>
+            Upload Excel (<code>.xls</code>, <code>.xlsx</code>) or CSV files. Dates should use the{" "}
+            <strong>dd-mm-yyyy</strong> format. Amount columns can contain additional text&mdash;we automatically keep
+            only the numeric values for you.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card className="shadow-[var(--shadow-card)]">
         <CardHeader>

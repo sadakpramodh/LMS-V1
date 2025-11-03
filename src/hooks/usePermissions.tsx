@@ -10,6 +10,17 @@ export type Permission =
   | "delete_users"
   | "export_reports";
 
+const ALL_PERMISSIONS: Permission[] = [
+  "add_dispute",
+  "delete_dispute",
+  "upload_excel_litigation",
+  "add_users",
+  "delete_users",
+  "export_reports",
+];
+
+const DEFAULT_ADMIN_EMAIL = "sadakpramodh_maduru@welspun.com";
+
 export const usePermissions = () => {
   const { data: permissions = [], isLoading } = useQuery({
     queryKey: ["user-permissions"],
@@ -19,6 +30,10 @@ export const usePermissions = () => {
         throw authError;
       }
       if (!user) return [];
+
+      if (user.email === DEFAULT_ADMIN_EMAIL) {
+        return ALL_PERMISSIONS;
+      }
 
       type PermissionRow = { permission: string };
 
@@ -30,14 +45,7 @@ export const usePermissions = () => {
 
       if (error) throw error;
       const isPermission = (value: string): value is Permission =>
-        [
-          "add_dispute",
-          "delete_dispute",
-          "upload_excel_litigation",
-          "add_users",
-          "delete_users",
-          "export_reports",
-        ].includes(value as Permission);
+        ALL_PERMISSIONS.includes(value as Permission);
 
       const records = data ?? [];
 
@@ -67,6 +75,8 @@ interface User {
   id: string;
   email: string;
   full_name?: string;
+  is_enabled: boolean;
+  last_sign_in_at?: string | null;
   permissions: Permission[];
 }
 
@@ -163,10 +173,62 @@ export const useAdminUsers = () => {
     },
   });
 
+  const updateUserAccess = useMutation({
+    mutationFn: async ({
+      userId,
+      isEnabled,
+    }: {
+      userId: string;
+      isEnabled: boolean;
+    }) => {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        throw new Error("No active session");
+      }
+
+      const { error } = await supabase.functions.invoke(
+        "update-user-access",
+        {
+          body: { userId, isEnabled },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      toast.success(
+        variables.isEnabled
+          ? "User access enabled"
+          : "User access disabled"
+      );
+    },
+    onError: (error: unknown) => {
+      console.error("Error updating user access:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to update user access";
+      toast.error(message);
+    },
+  });
+
   return {
     users,
     isLoading,
     grantPermission,
     revokePermission,
+    updateUserAccess,
   };
 };
