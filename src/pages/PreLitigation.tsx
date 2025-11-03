@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Search, Filter, Upload, Trash2, FileText, Clock, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import StatCard from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,27 +32,59 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import NewDisputeDialog from "@/components/NewDisputeDialog";
-import StatCard from "@/components/StatCard";
 import { useDisputes } from "@/hooks/useDisputes";
 import { usePermissions } from "@/hooks/usePermissions";
 import { format } from "date-fns";
 import { toast } from "sonner";
+
+const STATUS_OPTIONS = [
+  {
+    value: "Pending",
+    label: "Pending",
+    indicator: "bg-amber-500",
+    textClass: "text-amber-700",
+  },
+  {
+    value: "Under Review",
+    label: "Under Review",
+    indicator: "bg-blue-500",
+    textClass: "text-blue-700",
+  },
+  {
+    value: "Response Sent",
+    label: "Response Sent",
+    indicator: "bg-emerald-500",
+    textClass: "text-emerald-700",
+  },
+  {
+    value: "Closed",
+    label: "Closed",
+    indicator: "bg-muted-foreground/70",
+    textClass: "text-muted-foreground",
+  },
+] as const;
+
+const STATUS_LOOKUP = STATUS_OPTIONS.reduce<Record<string, (typeof STATUS_OPTIONS)[number]>>(
+  (acc, option) => {
+    acc[option.value] = option;
+    return acc;
+  },
+  {}
+);
+
+const getStatusMeta = (status: string) =>
+  STATUS_LOOKUP[status] ?? {
+    value: status,
+    label: status,
+    indicator: "bg-muted-foreground/40",
+    textClass: "text-foreground",
+  };
 
 export default function PreLitigation() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { disputes, loading, deleteDispute, updateDisputeStatus } = useDisputes();
   const { hasPermission } = usePermissions();
-
-  const getStatusVariant = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      "Pending": "destructive",
-      "Under Review": "secondary",
-      "Response Sent": "default",
-      "Closed": "outline",
-    };
-    return variants[status] || "default";
-  };
 
   const filteredDisputes = disputes.filter((dispute) => {
     const matchesSearch =
@@ -153,67 +186,81 @@ export default function PreLitigation() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredDisputes.map((dispute) => (
-                    <TableRow key={dispute.id} className="transition-colors hover:bg-muted/50">
-                      <TableCell className="font-medium">{dispute.company}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{dispute.dispute_type}</Badge>
-                      </TableCell>
-                      <TableCell>{dispute.notice_from}</TableCell>
-                      <TableCell className="font-semibold">₹{dispute.value}Cr</TableCell>
-                      <TableCell>
-                        {format(new Date(dispute.reply_due_date), "MMM dd, yyyy")}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={dispute.status}
-                          onValueChange={(value) => updateDisputeStatus(dispute.id, value)}
-                        >
-                          <SelectTrigger className="w-[140px]">
-                            <Badge variant={getStatusVariant(dispute.status)}>
-                              {dispute.status}
-                            </Badge>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Pending">Pending</SelectItem>
-                            <SelectItem value="Under Review">Under Review</SelectItem>
-                            <SelectItem value="Response Sent">Response Sent</SelectItem>
-                            <SelectItem value="Closed">Closed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {dispute.responsible_user}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {hasPermission("delete_dispute") && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Dispute</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete this dispute? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteDispute(dispute.id)}>
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredDisputes.map((dispute) => {
+                    const statusMeta = getStatusMeta(dispute.status);
+
+                    return (
+                      <TableRow key={dispute.id} className="transition-colors hover:bg-muted/50">
+                        <TableCell className="font-medium">{dispute.company}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{dispute.dispute_type}</Badge>
+                        </TableCell>
+                        <TableCell>{dispute.notice_from}</TableCell>
+                        <TableCell className="font-semibold">₹{dispute.value}Cr</TableCell>
+                        <TableCell>
+                          {format(new Date(dispute.reply_due_date), "MMM dd, yyyy")}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={dispute.status}
+                            onValueChange={(value) => updateDisputeStatus(dispute.id, value)}
+                          >
+                            <SelectTrigger className="w-[160px] justify-between bg-muted/40 border-border/60">
+                              <div className="flex items-center gap-2">
+                                <span className={`h-2.5 w-2.5 rounded-full ${statusMeta.indicator}`} />
+                                <span className={`text-sm font-medium ${statusMeta.textClass}`}>
+                                  {statusMeta.label}
+                                </span>
+                              </div>
+                              <SelectValue className="sr-only" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUS_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`h-2.5 w-2.5 rounded-full ${option.indicator}`} />
+                                    <span className="text-sm font-medium text-foreground">
+                                      {option.label}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {dispute.responsible_user}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            {hasPermission("delete_dispute") && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Dispute</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this dispute? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteDispute(dispute.id)}>
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
