@@ -106,7 +106,7 @@ export default function Litigation() {
         return null;
       }
 
-      const ddMmYyyyMatch = trimmed.match(/^([0-3]?\d)[-\/](0?\d|1[0-2])[-\/](\d{4})$/);
+      const ddMmYyyyMatch = trimmed.match(/^([0-3]?\d)[-/](0?\d|1[0-2])[-/](\d{4})$/);
       if (ddMmYyyyMatch) {
         const [, dd, mm, yyyy] = ddMmYyyyMatch;
         const day = Number.parseInt(dd, 10);

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { PostgrestError } from "@supabase/supabase-js";
+import {
+  addLocalLitigationCases,
+  getLocalLitigationCases,
+  removeLocalLitigationCase,
+} from "@/lib/litigationLocalStorage";
 
 export interface LitigationCase {
   id: string;
@@ -30,8 +36,19 @@ export const useLitigationCases = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchCases = useCallback(async () => {
+    setLoading(true);
+    let userId: string | null = null;
+
     try {
-      setLoading(true);
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError) throw authError;
+
+      userId = user?.id ?? null;
+
       const { data, error } = await supabase
         .from("litigation_cases")
         .select("*")
@@ -40,9 +57,22 @@ export const useLitigationCases = () => {
 
       if (error) throw error;
 
-      setCases(data ?? []);
+      const localCases = userId ? getLocalLitigationCases(userId) : [];
+      setCases(sortCases([...(data ?? []), ...localCases]));
     } catch (error: unknown) {
       console.error("Error fetching litigation cases:", error);
+
+      if (userId) {
+        const localCases = getLocalLitigationCases(userId);
+        if (localCases.length > 0) {
+          setCases(sortCases(localCases));
+          toast.warning(
+            "Showing locally saved litigation cases. Unable to sync with the server."
+          );
+          return;
+        }
+      }
+
       toast.error("Failed to load litigation cases");
     } finally {
       setLoading(false);
@@ -51,6 +81,19 @@ export const useLitigationCases = () => {
 
   const deleteCase = async (id: string) => {
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (id.startsWith("local-") && user) {
+        removeLocalLitigationCase(user.id, id);
+        setCases((previous) =>
+          sortCases(previous.filter((item) => item.id !== id))
+        );
+        toast.success("Case deleted successfully");
+        return;
+      }
+
       const { error } = await supabase
         .from("litigation_cases")
         .delete()
@@ -100,6 +143,12 @@ export const useLitigationCases = () => {
         .returns<LitigationCase[]>();
 
       if (error) {
+        if (isPermissionError(error)) {
+          const stored = handleLocalFallback(user.id, casesData);
+          setCases((previous) => sortCases([...stored, ...previous]));
+          return;
+        }
+
         console.error("Insert error:", error);
         throw error;
       }
@@ -145,4 +194,32 @@ export const useLitigationCases = () => {
     deleteCase,
     bulkInsertCases,
   };
+};
+
+const isPermissionError = (error: unknown): error is PostgrestError => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as PostgrestError).code === "42501"
+  );
+};
+
+const sortCases = (items: LitigationCase[]): LitigationCase[] => {
+  return [...items].sort((a, b) => {
+    const first = new Date(a.created_at).getTime();
+    const second = new Date(b.created_at).getTime();
+    return second - first;
+  });
+};
+
+const handleLocalFallback = (
+  userId: string,
+  casesData: LitigationCaseInsert[]
+) => {
+  const stored = addLocalLitigationCases(userId, casesData);
+  toast.success(
+    `Stored ${stored.length} cases locally. They will remain available on this device until permissions are updated.`
+  );
+  return stored;
 };
