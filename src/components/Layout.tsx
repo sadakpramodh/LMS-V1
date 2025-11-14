@@ -1,5 +1,15 @@
 import { Link, useLocation } from "react-router-dom";
-import { Scale, FileText, Gavel, BarChart3, Settings as SettingsIcon, LogOut, User, Shield } from "lucide-react";
+import {
+  Scale,
+  FileText,
+  Gavel,
+  Swords,
+  BarChart3,
+  Settings as SettingsIcon,
+  LogOut,
+  User,
+  Shield,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -16,6 +26,7 @@ const navItems = [
   { to: "/", icon: BarChart3, label: "Dashboard" },
   { to: "/pre-litigation", icon: FileText, label: "Pre-Litigation" },
   { to: "/litigation", icon: Gavel, label: "Litigation" },
+  { to: "/arbitration", icon: Swords, label: "Arbitration" },
   { to: "/admin", icon: Shield, label: "Admin" },
 ];
 
