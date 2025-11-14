@@ -9,6 +9,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import PreLitigation from "./pages/PreLitigation";
 import Litigation from "./pages/Litigation";
+import Arbitration from "./pages/Arbitration";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
@@ -51,6 +52,16 @@ const App = () => (
                 <ProtectedRoute>
                   <Layout>
                     <Litigation />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/arbitration"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Arbitration />
                   </Layout>
                 </ProtectedRoute>
               }
