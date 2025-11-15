@@ -1,5 +1,21 @@
-import { useState, useRef } from "react";
-import { Plus, Search, Filter, Calendar, FileText, Upload, Trash2, Info } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import {
+  BalanceScale,
+  BellRing,
+  Building2,
+  Calendar,
+  FileText,
+  Filter,
+  FolderSearch,
+  Gavel,
+  Layers,
+  Search,
+  Plus,
+  ScanSearch,
+  Sparkles,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 import {
   useLitigationCases,
@@ -27,6 +43,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import StatCard from "@/components/StatCard";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function Litigation() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -34,6 +52,95 @@ export default function Litigation() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { cases, loading, deleteCase, bulkInsertCases } = useLitigationCases();
   const { hasPermission } = usePermissions();
+
+  const litigationStats = useMemo(() => {
+    const total = cases.length;
+    const financialExposure = cases.reduce((sum, item) => sum + (item.claim_amount ?? 0), 0);
+    const interestExposure = cases.reduce((sum, item) => sum + (item.interest_amount ?? 0), 0);
+    const highValue = cases.filter((item) => (item.claim_amount ?? 0) > 5_00_00_000).length;
+    const withNextHearing = cases.filter((item) => Boolean(item.next_hearing_date)).length;
+    const byCategory = cases.reduce<Record<string, number>>((acc, item) => {
+      const category = (item.category ?? "Uncategorized").toLowerCase();
+      acc[category] = (acc[category] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      total,
+      financialExposure,
+      interestExposure,
+      highValue,
+      withNextHearing,
+      byCategory,
+    };
+  }, [cases]);
+
+  const intakeChecklist = [
+    {
+      title: "Case Essentials",
+      items: [
+        "Category, Sub-category, Case Type",
+        "Case Number, Year & Forum",
+        "Company, Subsidiary, Unit / Region",
+        "Opposing Parties & Authorized Signatory",
+      ],
+    },
+    {
+      title: "Matter Details",
+      items: [
+        "Facts, Issues, Prayers",
+        "Legal Nature & Sub-nature",
+        "KMP Involvement & Team",
+        "Pleadings & Orders Upload",
+      ],
+    },
+    {
+      title: "Financial Capture",
+      items: [
+        "Claim Amount, Interest, Penalties",
+        "Provision & Contingent Liability",
+        "Exposure by Entity",
+        "Linked Notices / Arbitrations",
+      ],
+    },
+    {
+      title: "Counsel & Law Firms",
+      items: [
+        "Company Counsel & Law Firm",
+        "Opposite Party Counsel",
+        "Engagement Letters & Fees",
+        "Hearing Strategy Notes",
+      ],
+    },
+  ];
+
+  const lifecycleTimeline = [
+    "Case filed",
+    "Court accepted & assigned number",
+    "First hearing",
+    "Replies/Rejoinders filed",
+    "Applications filed",
+    "Orders uploaded",
+    "Final hearing",
+    "Judgment",
+    "Appeal (if any)",
+    "Closure",
+  ];
+
+  const discoveryCapabilities = [
+    "Case number & year",
+    "Court name / type / state / district / bench",
+    "Case type & category",
+    "CNR number",
+    "Status & orders availability",
+  ];
+
+  const integrationHighlights = [
+    "Crawler sync with High Courts, District Courts, Magistrate Courts, Arbitration portals, CMMS Courts",
+    "Automatic fetch of next hearing, bench/judge, latest orders, status/stage",
+    "GenAI generated case summaries, draft generation, clause suggestions",
+    "Classification for category/sub-category & timeline auto-generation",
+  ];
 
   // Sanitize Excel row to prevent formula injection
   const sanitizeValue = (value: unknown): unknown => {
@@ -331,8 +438,10 @@ export default function Litigation() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Litigation Cases</h1>
-          <p className="mt-1 text-muted-foreground">Track all active court and arbitration proceedings</p>
+          <h1 className="text-3xl font-bold text-foreground">Litigation Management</h1>
+          <p className="mt-1 text-muted-foreground">
+            Track court matters, monitor hearings and manage financial exposure across the portfolio
+          </p>
         </div>
         <div className="flex gap-2">
           {hasPermission("upload_excel_litigation") && (
@@ -350,25 +459,229 @@ export default function Litigation() {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="h-4 w-4" />
-                Bulk Upload
+                Import Litigation
               </Button>
             </>
           )}
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
-            New Case
+            Add Litigation
           </Button>
         </div>
       </div>
 
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Total Matters"
+          value={litigationStats.total}
+          icon={Gavel}
+          trend={{
+            value: `${litigationStats.byCategory.civil ?? 0} Civil · ${litigationStats.byCategory.labour ?? 0} Labour`,
+            isPositive: false,
+          }}
+          variant="default"
+        />
+        <StatCard
+          title="Financial Exposure"
+          value={new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency: "INR",
+            maximumFractionDigits: 0,
+          }).format(litigationStats.financialExposure)}
+          icon={Building2}
+          trend={{ value: `${litigationStats.highValue} high value matters`, isPositive: false }}
+          variant="warning"
+        />
+        <StatCard
+          title="Interest & Penalties"
+          value={new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency: "INR",
+            maximumFractionDigits: 0,
+          }).format(litigationStats.interestExposure)}
+          icon={BalanceScale}
+          trend={{ value: "Tracking accrued interest & penalty", isPositive: false }}
+          variant="default"
+        />
+        <StatCard
+          title="Upcoming Hearings"
+          value={litigationStats.withNextHearing}
+          icon={Calendar}
+          trend={{ value: "Synced to calendar & alerts", isPositive: true }}
+          variant="success"
+        />
+      </div>
+
+      <Card className="shadow-[var(--shadow-card)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Case Intake Checklist
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {intakeChecklist.map((section) => (
+            <div key={section.title} className="rounded-lg border border-border p-4">
+              <p className="text-sm font-semibold text-foreground">{section.title}</p>
+              <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
+                {section.items.map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              Litigation Lifecycle & Alerts
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {lifecycleTimeline.map((stage, index) => (
+              <div key={stage} className="flex items-start gap-3 rounded-md border border-border p-3 text-sm">
+                <span className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                  {index + 1}
+                </span>
+                <div>
+                  <p className="font-medium text-foreground">{stage}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {index === 0 && "Log pleadings and attach filings"}
+                    {index === 1 && "Capture CNR / diary numbers via crawler"}
+                    {index === 2 && "Auto-create hearing entry & calendar invite"}
+                    {index === 3 && "Track reply / rejoinder filings"}
+                    {index === 4 && "Monitor interim applications & tasks"}
+                    {index === 5 && "Upload orders with OCR summaries"}
+                    {index === 6 && "Readiness tracker for final arguments"}
+                    {index === 7 && "Capture judgment & impact"}
+                    {index === 8 && "Escalate for appeal decisions"}
+                    {index === 9 && "Close matter with audit log"}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BellRing className="h-5 w-5" />
+              Calendar & Task Sync
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="rounded-md border border-border p-3">
+              Hearing calendar shows bench, judge, location, last hearing status and upcoming tasks.
+            </div>
+            <div className="rounded-md border border-border p-3">
+              Notice calendar highlights received dates, reply due, category and risk for monitoring.
+            </div>
+            <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+              Filter calendars by company, subsidiary, unit, category, risk, court and period (month/year).
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FolderSearch className="h-5 w-5" />
+              Discovery (Case-wise Search)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Search by identifiers or perform a federated search across orders and pleadings. Missing data is clearly highlighted for follow-up.
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Input placeholder="Case Number" />
+              <Input placeholder="Case Year" />
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Court Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="high">High Court</SelectItem>
+                  <SelectItem value="district">District Court</SelectItem>
+                  <SelectItem value="magistrate">Magistrate Court</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input placeholder="State" />
+              <Input placeholder="District" />
+              <Input placeholder="Bench" />
+              <Input placeholder="Case Type" />
+              <Input placeholder="CNR Number" />
+            </div>
+            <Textarea placeholder="Free text search – parties, facts, orders" />
+            <Button className="gap-2">
+              <ScanSearch className="h-4 w-4" />
+              Run Discovery
+            </Button>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              {discoveryCapabilities.map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Bulk Import & Validation
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="rounded-md border border-border p-3">
+              Download templates, populate litigation data and upload Excel for validation. Invalid data, duplicates and pre-existing cases are flagged.
+            </div>
+            <div className="rounded-md border border-border p-3">
+              Applies to both litigation and notice imports with staged review before final commit.
+            </div>
+            <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+              Final import preserves original files and writes audit logs for compliance.
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="shadow-[var(--shadow-card)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            Integrations & Intelligence
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {integrationHighlights.map((item) => (
+            <div key={item} className="rounded-lg border border-border p-4 text-xs text-muted-foreground">
+              {item}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
       {hasPermission("upload_excel_litigation") && (
         <Alert className="shadow-[var(--shadow-card)] border-dashed">
-          <Info className="h-4 w-4" />
+          <Upload className="h-4 w-4" />
           <AlertTitle>Bulk upload tips</AlertTitle>
           <AlertDescription>
-            Upload Excel (<code>.xls</code>, <code>.xlsx</code>) or CSV files. Dates should use the{" "}
-            <strong>dd-mm-yyyy</strong> format. Amount columns can contain additional text&mdash;we automatically keep
-            only the numeric values for you.
+            Upload Excel (<code>.xls</code>, <code>.xlsx</code>) or CSV files. Dates should use the <strong>dd-mm-yyyy</strong>
+            format. Amount columns may include currency symbols—only numeric values are processed.
           </AlertDescription>
         </Alert>
       )}
