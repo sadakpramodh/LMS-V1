@@ -1,5 +1,19 @@
 import { useState } from "react";
-import { Search, Filter, Upload, Trash2, FileText, Clock, TrendingUp } from "lucide-react";
+import {
+  AlertTriangle,
+  BellRing,
+  Briefcase,
+  ClipboardList,
+  Clock,
+  FileText,
+  Filter,
+  Layers,
+  Search,
+  ShieldCheck,
+  Trash2,
+  TrendingUp,
+  Upload,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import StatCard from "@/components/StatCard";
@@ -86,6 +100,90 @@ export default function PreLitigation() {
   const { disputes, loading, deleteDispute, updateDisputeStatus } = useDisputes();
   const { hasPermission } = usePermissions();
 
+  const summary = {
+    total: disputes.length,
+    open: disputes.filter((dispute) => dispute.status !== "Closed").length,
+    closed: disputes.filter((dispute) => dispute.status === "Closed").length,
+    upcomingReplies: disputes.filter((dispute) => {
+      if (!dispute.reply_due_date) return false;
+      const dueDate = new Date(dispute.reply_due_date);
+      const today = new Date();
+      const diff = (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+      return diff >= 0 && diff <= 7;
+    }).length,
+  };
+
+  const intakeBlueprint = [
+    {
+      title: "Parties & Ownership",
+      items: [
+        "Company, Subsidiary, Unit",
+        "Opposite Party & Subsidiaries",
+        "Department & Reporting Manager",
+        "Assigned Legal Officer",
+      ],
+    },
+    {
+      title: "Notice Intelligence",
+      items: [
+        "Category & Sub-category",
+        "Notice & Receipt Dates",
+        "Last Date for Reply",
+        "Relief Sought & Relevant Law",
+      ],
+    },
+    {
+      title: "Risk & Financials",
+      items: [
+        "Risk Rating & Comments",
+        "Amount Involved",
+        "Provision & Contingent Liability",
+        "Team Responsibility",
+      ],
+    },
+    {
+      title: "Law Firm Mapping",
+      items: [
+        "Company's Law Firm",
+        "Opposite Party Firm",
+        "Negotiation / Escalation Notes",
+        "Document Checklist",
+      ],
+    },
+  ];
+
+  const lifecycleStages = [
+    "Notice Received",
+    "Reply Drafted",
+    "Reply Sent",
+    "Counter-Reply Received",
+    "Negotiations / Internal Discussions",
+    "Escalation",
+    "Closed or Converted to Litigation",
+  ];
+
+  const alertMatrix = [
+    { title: "Notice Logged", detail: "Instant alert to assigned officer & manager" },
+    { title: "Reply Due T-7/T-3/T-1", detail: "Automated reminders with escalation path" },
+    { title: "Reply Overdue", detail: "Red flag on dashboard & mail to legal manager" },
+    { title: "Escalation", detail: "Escalate to reporting manager & CXO" },
+  ];
+
+  const searchFilters = [
+    "Company / Subsidiary / Unit",
+    "Category & Sub-category",
+    "Risk & Status",
+    "State & City",
+    "Free-text across parties, references, facts",
+  ];
+
+  const responsibilityMatrix = [
+    { role: "Legal Executive", duties: "Capture notice, draft reply, upload documents" },
+    { role: "Legal Manager", duties: "Review drafts, approve responses, track negotiations" },
+    { role: "Business User", duties: "Provide initial facts, review response for accuracy" },
+    { role: "Finance User", duties: "Validate exposure, update provisions" },
+  ];
+
   const filteredDisputes = disputes.filter((dispute) => {
     const matchesSearch =
       dispute.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -127,6 +225,160 @@ export default function PreLitigation() {
           <p className="mt-1 text-muted-foreground">Manage disputes before court filing</p>
         </div>
         {hasPermission("add_dispute") && <NewDisputeDialog />}
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Open Notices"
+          value={summary.open}
+          icon={ClipboardList}
+          trend={{ value: `${summary.upcomingReplies} replies due in 7 days`, isPositive: false }}
+          variant="warning"
+        />
+        <StatCard
+          title="Closed Notices"
+          value={summary.closed}
+          icon={ShieldCheck}
+          trend={{ value: `${summary.total} total logged`, isPositive: true }}
+          variant="success"
+        />
+        <StatCard
+          title="Financial Exposure"
+          value={`₹${stats.totalValue.toFixed(1)} Cr`}
+          icon={TrendingUp}
+          trend={{ value: "Includes provisions & contingencies", isPositive: true }}
+          variant="default"
+        />
+        <StatCard
+          title="High Risk Notices"
+          value={stats.byStatus["Pending"] ?? 0}
+          icon={AlertTriangle}
+          trend={{ value: "Monitor for escalation", isPositive: false }}
+          variant="destructive"
+        />
+      </div>
+
+      <Card className="shadow-[var(--shadow-card)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Briefcase className="h-5 w-5" />
+            Notice Intake Blueprint
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {intakeBlueprint.map((section) => (
+            <div key={section.title} className="rounded-lg border border-border p-4">
+              <p className="text-sm font-semibold text-foreground">{section.title}</p>
+              <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
+                {section.items.map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              Notice Lifecycle & Controls
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {lifecycleStages.map((stage, index) => (
+              <div key={stage} className="flex items-start gap-3 rounded-md border border-border p-3 text-sm">
+                <span className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                  {index + 1}
+                </span>
+                <div>
+                  <p className="font-medium text-foreground">{stage}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {index === 0 && "Intake through portal with audit trails"}
+                    {index === 1 && "Drafting assisted by templates & GenAI"}
+                    {index === 2 && "Reply dispatch logged with evidence"}
+                    {index === 3 && "Capture counter positions & attach documents"}
+                    {index === 4 && "Internal meetings & negotiation outcomes"}
+                    {index === 5 && "Escalate to management with risk commentary"}
+                    {index === 6 && "Close the matter or convert into litigation case"}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BellRing className="h-5 w-5" />
+              Alerts & Escalations
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {alertMatrix.map((item) => (
+              <div key={item.title} className="rounded-md border border-border p-3 text-sm">
+                <p className="font-medium text-foreground">{item.title}</p>
+                <p className="text-xs text-muted-foreground">{item.detail}</p>
+              </div>
+            ))}
+            <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+              Escalations auto-update dashboards, calendars and send notifications to role-based recipients.
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Search & Discovery
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Combine filters and free-text search to instantly surface historical notices, precedents and risk learnings.
+            </p>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              {searchFilters.map((filter) => (
+                <li key={filter} className="flex items-start gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
+                  <span>{filter}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="rounded-md border border-dashed border-primary/40 p-3 text-xs text-primary">
+              Tip: Use Discovery Search for cross-matter research and case conversion readiness.
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Responsibility & Financial Tracking
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {responsibilityMatrix.map((item) => (
+              <div key={item.role} className="rounded-md border border-border p-3 text-sm">
+                <p className="font-medium text-foreground">{item.role}</p>
+                <p className="text-xs text-muted-foreground">{item.duties}</p>
+              </div>
+            ))}
+            <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+              Financial sections capture amount involved, provisioning status, contingent liabilities and link to finance reviews.
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="shadow-[var(--shadow-card)]">

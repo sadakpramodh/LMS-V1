@@ -1,4 +1,4 @@
-import { Shield, CheckCircle } from "lucide-react";
+import { CheckCircle, ListChecks, Shield, Users2 } from "lucide-react";
 import { usePermissions, useAdminUsers, Permission } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,54 @@ export default function Admin() {
 
   const permissionKeys = Object.keys(PERMISSION_LABELS) as Permission[];
   const totalColumns = 2 + permissionKeys.length + 1;
+
+  const scopeModules = [
+    "Dashboard",
+    "Notice Management (Pre-Litigation)",
+    "Litigation Management",
+    "Discovery (Case-wise Search)",
+    "Litigation & Notice Calendar",
+    "Bulk Import (Notices, Litigations)",
+    "Arbitration Tracking",
+    "References & Document Repository",
+    "Reports & Trend Analysis",
+    "GenAI Integrations",
+    "User Management & Roles",
+    "Crawler Integration for Court Websites",
+  ];
+
+  const roleMatrix = [
+    {
+      role: "Admin",
+      description: "Full system control",
+      access: "All modules, user creation, configuration",
+    },
+    {
+      role: "Legal Manager",
+      description: "Supervises disputes/litigations",
+      access: "Add/Edit, Approvals, Reports",
+    },
+    {
+      role: "Legal Executive",
+      description: "Handles notices/litigation",
+      access: "Add/Edit, Upload documents",
+    },
+    {
+      role: "Business User",
+      description: "Department-level reviewer",
+      access: "Read-only, upload initial details",
+    },
+    {
+      role: "Finance User",
+      description: "Financial exposure review",
+      access: "Read-only financial sections",
+    },
+    {
+      role: "CXO / GC",
+      description: "High-level visibility",
+      access: "Dashboard, Reports",
+    },
+  ];
 
   if (permissionsLoading) {
     return (
@@ -82,6 +130,42 @@ export default function Admin() {
           <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
           <p className="mt-1 text-muted-foreground">Manage users and permissions</p>
         </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <ListChecks className="h-4 w-4" />
+              In-Scope Modules
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 md:grid-cols-2">
+            {scopeModules.map((module) => (
+              <div key={module} className="rounded-md border border-border p-3 text-xs text-muted-foreground">
+                {module}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Users2 className="h-4 w-4" />
+              Roles & Permissions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {roleMatrix.map((entry) => (
+              <div key={entry.role} className="rounded-md border border-border p-3 text-xs text-muted-foreground">
+                <p className="text-sm font-semibold text-foreground">{entry.role}</p>
+                <p className="mt-1">{entry.description}</p>
+                <p className="mt-1 font-medium text-primary">{entry.access}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="shadow-[var(--shadow-card)]">
