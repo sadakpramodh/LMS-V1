@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from "react";
 import {
-  BalanceScale,
   BellRing,
   Building2,
   Calendar,
@@ -12,6 +11,7 @@ import {
   Search,
   Plus,
   ScanSearch,
+  Scale,
   Sparkles,
   Trash2,
   Upload,
@@ -499,7 +499,7 @@ export default function Litigation() {
             currency: "INR",
             maximumFractionDigits: 0,
           }).format(litigationStats.interestExposure)}
-          icon={BalanceScale}
+          icon={Scale}
           trend={{ value: "Tracking accrued interest & penalty", isPositive: false }}
           variant="default"
         />
