@@ -3,6 +3,9 @@ import {
   BellRing,
   Building2,
   Calendar,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Filter,
   FolderSearch,
@@ -19,6 +22,7 @@ import {
 import * as XLSX from "xlsx";
 import {
   useLitigationCases,
+  type LitigationCase,
   type LitigationCaseInsert,
 } from "@/hooks/useLitigationCases";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -49,9 +53,20 @@ import { Textarea } from "@/components/ui/textarea";
 export default function Litigation() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { cases, loading, deleteCase, bulkInsertCases } = useLitigationCases();
   const { hasPermission } = usePermissions();
+
+  const formatDateKey = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, "0");
+    const day = `${date.getDate()}`.padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   const litigationStats = useMemo(() => {
     const total = cases.length;
@@ -141,6 +156,8 @@ export default function Litigation() {
     "GenAI generated case summaries, draft generation, clause suggestions",
     "Classification for category/sub-category & timeline auto-generation",
   ];
+
+  const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   // Sanitize Excel row to prevent formula injection
   const sanitizeValue = (value: unknown): unknown => {
@@ -428,19 +445,61 @@ export default function Litigation() {
       searchQuery === "" ||
       litigationCase.parties.toLowerCase().includes(searchQuery.toLowerCase()) ||
       litigationCase.forum.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesStatus = statusFilter === "all" || litigationCase.status.toLowerCase() === statusFilter.toLowerCase();
-    
+
     return matchesSearch && matchesStatus;
   });
+
+  const hearingEventsByDate = useMemo(() => {
+    const eventMap: Record<string, LitigationCase[]> = {};
+
+    cases.forEach((caseItem) => {
+      if (caseItem.next_hearing_date) {
+        const dateKey = caseItem.next_hearing_date.split("T")[0];
+        eventMap[dateKey] = eventMap[dateKey] ? [...eventMap[dateKey], caseItem] : [caseItem];
+      }
+    });
+
+    return eventMap;
+  }, [cases]);
+
+  const calendarDays = useMemo(() => {
+    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const daysInMonth = new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0).getDate();
+    const firstDayIndex = startOfMonth.getDay();
+
+    const days: Array<Date | null> = Array(firstDayIndex).fill(null);
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      days.push(new Date(startOfMonth.getFullYear(), startOfMonth.getMonth(), day));
+    }
+
+    while (days.length % 7 !== 0) {
+      days.push(null);
+    }
+
+    return days;
+  }, [currentMonth]);
+
+  const handleMonthChange = (direction: "prev" | "next") => {
+    setCurrentMonth((previous) => {
+      const updated = new Date(previous);
+      updated.setMonth(previous.getMonth() + (direction === "next" ? 1 : -1));
+      updated.setDate(1);
+      return updated;
+    });
+  };
+
+  const todayKey = formatDateKey(new Date());
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Litigation Management</h1>
+          <h1 className="text-3xl font-bold text-foreground">Litigation Management System</h1>
           <p className="mt-1 text-muted-foreground">
-            Track court matters, monitor hearings and manage financial exposure across the portfolio
+            Track court matters, monitor hearings, manage financial exposure, and view upcoming schedules in one place
           </p>
         </div>
         <div className="flex gap-2">
@@ -511,6 +570,116 @@ export default function Litigation() {
           variant="success"
         />
       </div>
+
+      <Card className="shadow-[var(--shadow-card)]">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5" />
+              Hearing Calendar
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Bootstrap-inspired calendar to visualize upcoming hearings at a glance
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Previous month"
+              onClick={() => handleMonthChange("prev")}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="min-w-[190px] rounded-md border bg-muted/40 px-3 py-2 text-center font-semibold">
+              {currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Next month"
+              onClick={() => handleMonthChange("next")}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/70">
+                <tr>
+                  {daysOfWeek.map((day) => (
+                    <th key={day} className="border-b border-r px-4 py-2 text-left font-medium text-muted-foreground">
+                      {day}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: calendarDays.length / 7 }).map((_, weekIndex) => (
+                  <tr key={weekIndex}>
+                    {calendarDays.slice(weekIndex * 7, weekIndex * 7 + 7).map((day, dayIndex) => {
+                      const dateKey = day ? formatDateKey(day) : null;
+                      const events = dateKey ? hearingEventsByDate[dateKey] ?? [] : [];
+                      const isToday = dateKey === todayKey;
+
+                      return (
+                        <td
+                          key={`${weekIndex}-${dayIndex}`}
+                          className="align-top border-r border-b px-3 py-3 last:border-r-0"
+                        >
+                          {day ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-sm font-semibold ${
+                                    events.length > 0
+                                      ? "bg-primary/10 text-primary border-primary/30"
+                                      : "bg-background"
+                                  } ${isToday ? "ring-2 ring-primary" : ""}`}
+                                >
+                                  {day.getDate()}
+                                </span>
+                                {events.length > 0 && (
+                                  <Badge variant="secondary" className="ml-auto">
+                                    {events.length} hearing{events.length > 1 ? "s" : ""}
+                                  </Badge>
+                                )}
+                              </div>
+                              {events.length > 0 ? (
+                                <ul className="space-y-1 text-xs text-foreground">
+                                  {events.slice(0, 2).map((eventCase) => (
+                                    <li key={eventCase.id} className="flex items-start gap-2">
+                                      <Calendar className="mt-0.5 h-3 w-3 text-muted-foreground" />
+                                      <span className="line-clamp-2">
+                                        {eventCase.parties} · {eventCase.forum}
+                                      </span>
+                                    </li>
+                                  ))}
+                                  {events.length > 2 && (
+                                    <p className="text-[11px] text-muted-foreground">
+                                      +{events.length - 2} more hearings
+                                    </p>
+                                  )}
+                                </ul>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">No hearings scheduled</p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="h-12" />
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-[var(--shadow-card)]">
         <CardHeader>
