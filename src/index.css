@@ -137,3 +137,88 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Calendar polish to mirror a modern Bootstrap-inspired widget while staying responsive */
+.rdp {
+  width: 100%;
+  font-size: 0.95rem;
+  color: hsl(var(--foreground));
+}
+
+.rdp-months {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .rdp-months {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.rdp-nav_button {
+  border-radius: 50%;
+  transition: var(--transition-smooth);
+}
+
+.rdp-nav_button:hover {
+  background: hsl(var(--primary) / 0.08);
+  color: hsl(var(--primary));
+}
+
+.rdp-caption_dropdowns select,
+.rdp-dropdown {
+  border-radius: 9999px;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.rdp-day {
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: var(--transition-smooth);
+}
+
+.rdp-day:hover:not(.rdp-day_disabled) {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05));
+  border-color: hsl(var(--primary) / 0.25);
+}
+
+.rdp-day_selected,
+.rdp-day_selected:hover {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+
+.rdp-day:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+.rdp-day-hearing {
+  background: hsl(var(--primary) / 0.15);
+  color: hsl(var(--primary));
+  font-weight: 700;
+  border-color: hsl(var(--primary) / 0.4);
+}
+
+.rdp-day-dispute {
+  background: hsl(var(--accent) / 0.18);
+  color: hsl(var(--accent-foreground));
+  font-weight: 700;
+  border-color: hsl(var(--accent) / 0.35);
+}
+
+@media (max-width: 640px) {
+  .rdp {
+    font-size: 0.9rem;
+  }
+
+  .rdp-caption_dropdowns select,
+  .rdp-dropdown {
+    width: 100%;
+  }
+}

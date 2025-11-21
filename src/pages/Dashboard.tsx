@@ -2,6 +2,7 @@ import {
   AlertCircle,
   Building2,
   CalendarClock,
+  CalendarDays,
   ClipboardList,
   FileText,
   FolderSearch,
@@ -15,6 +16,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { DayPicker } from "react-day-picker";
+import { addDays, format, parseISO } from "date-fns";
+import "react-day-picker/dist/style.css";
 import StatCard from "@/components/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -205,6 +209,62 @@ export default function Dashboard() {
     ],
   } as const;
 
+  const calendarEvents = [
+    {
+      id: "CAL-001",
+      title: "Appeal Hearing – Industrial Tribunal",
+      date: addDays(new Date(), 1).toISOString(),
+      type: "hearing" as const,
+      venue: "Industrial Tribunal, Mumbai",
+      owner: "Labour Team",
+    },
+    {
+      id: "CAL-002",
+      title: "Case Management – EPC Contract",
+      date: addDays(new Date(), 3).toISOString(),
+      type: "hearing" as const,
+      venue: "High Court – Bench 2",
+      owner: "Projects Legal",
+    },
+    {
+      id: "CAL-003",
+      title: "Reply Due – Vendor Notice",
+      date: addDays(new Date(), 4).toISOString(),
+      type: "dispute" as const,
+      venue: "Drafting Room",
+      owner: "Commercial Legal",
+    },
+    {
+      id: "CAL-004",
+      title: "Arbitration Filing Deadline",
+      date: addDays(new Date(), 6).toISOString(),
+      type: "dispute" as const,
+      venue: "SIAC e-Portal",
+      owner: "External Counsel",
+    },
+    {
+      id: "CAL-005",
+      title: "Dispute Review – Retail Claims",
+      date: addDays(new Date(), 8).toISOString(),
+      type: "dispute" as const,
+      venue: "VC – Litigation Room",
+      owner: "Retail Legal",
+    },
+  ];
+
+  const upcomingCalendarEvents = useMemo(
+    () =>
+      [...calendarEvents]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 4),
+    [calendarEvents]
+  );
+
+  const calendarMonth = useMemo(
+    () => (calendarEvents.length ? parseISO(calendarEvents[0].date) : new Date()),
+    [calendarEvents]
+  );
+
   const reports = [
     {
       title: "Notice Intelligence",
@@ -314,6 +374,90 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="overflow-hidden shadow-[var(--shadow-card)]">
+        <CardHeader className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent pb-4">
+          <CardTitle className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <span className="flex items-center gap-2 text-lg sm:text-xl">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              Litigation Calendar
+            </span>
+            <p className="text-xs text-muted-foreground">
+              Upcoming hearings, replies, and dispute milestones across entities
+            </p>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-xl bg-white/70 p-3 shadow-sm ring-1 ring-border backdrop-blur-md transition duration-500 ease-out hover:-translate-y-1 hover:shadow-md dark:bg-card/80">
+            <DayPicker
+              mode="single"
+              defaultMonth={calendarMonth}
+              weekStartsOn={1}
+              showOutsideDays
+              modifiers={{
+                hearings: calendarEvents.filter((event) => event.type === "hearing").map((event) => parseISO(event.date)),
+                disputes: calendarEvents.filter((event) => event.type === "dispute").map((event) => parseISO(event.date)),
+              }}
+              modifiersClassNames={{
+                hearings: "rdp-day-hearing",
+                disputes: "rdp-day-dispute",
+              }}
+              className="w-full animate-in fade-in duration-700"
+              captionLayout="dropdown-buttons"
+              fromYear={2024}
+              toYear={2026}
+            />
+            <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 font-medium text-primary">
+                <span className="h-2 w-2 rounded-full bg-primary" /> Hearings
+              </span>
+              <span className="flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
+                <span className="h-2 w-2 rounded-full bg-amber-500" /> Replies & Disputes
+              </span>
+              <span className="flex items-center gap-2 rounded-full bg-muted px-3 py-1">
+                <span className="h-2 w-2 rounded-full bg-muted-foreground/60" /> Tap a date to inspect due items
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-3 lg:space-y-4">
+            {upcomingCalendarEvents.map((event) => (
+              <div
+                key={event.id}
+                className="group flex flex-col gap-2 rounded-xl border border-border bg-gradient-to-r from-muted/60 via-background to-background p-4 transition-all duration-500 ease-out hover:-translate-y-1 hover:border-primary/60 hover:shadow-lg"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground sm:text-base">
+                      {event.title}
+                    </p>
+                    <p className="text-xs font-medium text-primary">
+                      {format(parseISO(event.date), "EEEE, d LLL yyyy")}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="border-primary/30 bg-primary/5 text-xs capitalize text-primary">
+                    {event.type === "hearing" ? "Hearing" : "Dispute"}
+                  </Badge>
+                </div>
+                <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                  <span className="flex items-center gap-2 rounded-md bg-secondary px-2 py-1 text-foreground">
+                    <CalendarClock className="h-4 w-4 text-primary" />
+                    {event.venue}
+                  </span>
+                  <span className="flex items-center gap-2 rounded-md bg-secondary px-2 py-1 text-foreground">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Owner: {event.owner}
+                  </span>
+                  <span className="flex items-center gap-2 rounded-md bg-secondary px-2 py-1 text-foreground">
+                    <Gauge className="h-4 w-4 text-primary" />
+                    Due in {Math.max(1, Math.ceil((parseISO(event.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="shadow-[var(--shadow-card)]">
