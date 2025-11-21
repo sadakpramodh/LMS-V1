@@ -472,19 +472,19 @@ export default function Dashboard() {
               {upcomingHearings.map((hearing) => (
                 <div
                   key={hearing.id}
-                  className="flex items-start justify-between rounded-lg border border-border p-4 transition-all duration-300 hover:border-primary/50 hover:shadow-sm"
+                  className="flex flex-col gap-3 rounded-lg border border-border p-4 transition-all duration-300 hover:border-primary/50 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">{hearing.title}</p>
+                  <div className="space-y-1 text-left sm:min-w-0">
+                    <p className="text-sm font-medium text-foreground sm:truncate">{hearing.title}</p>
                     <p className="text-xs text-muted-foreground">{hearing.caseNumber}</p>
-                    <Badge variant="outline" className="mt-2">
+                    <Badge variant="outline" className="mt-2 w-fit sm:w-auto">
                       {hearing.forum}
                     </Badge>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right">
                     <p className="text-sm font-semibold text-foreground">
-                      {new Date(hearing.date).toLocaleDateString('en-IN', { 
-                        month: 'short', 
+                      {new Date(hearing.date).toLocaleDateString('en-IN', {
+                        month: 'short',
                         day: 'numeric',
                         year: 'numeric'
                       })}
@@ -604,15 +604,17 @@ export default function Dashboard() {
           <CardContent className="grid gap-3">
             {quickLinks.map((link) => (
               <Link key={link.label} to={link.to} className="group">
-                <div className="flex items-center justify-between rounded-lg border border-border p-4 transition-colors group-hover:border-primary/60">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <div className="flex flex-col gap-3 rounded-lg border border-border p-4 transition-colors group-hover:border-primary/60 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-foreground sm:flex-wrap">
                       <link.icon className="h-4 w-4 text-primary" />
                       {link.label}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">{link.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {link.description}
+                    </p>
                   </div>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" className="w-full sm:w-auto">
                     Open
                   </Button>
                 </div>
@@ -629,7 +631,7 @@ export default function Dashboard() {
             Portfolio Filters
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Select value={filters.company} onValueChange={(value) => handleFilterChange("company", value)}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Company" />

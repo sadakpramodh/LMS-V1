@@ -212,6 +212,38 @@ All colors MUST be HSL.
   border-color: hsl(var(--accent) / 0.35);
 }
 
+@media (max-width: 900px) {
+  .rdp-months {
+    grid-template-columns: 1fr;
+  }
+
+  .rdp-caption {
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .rdp-day {
+    padding: 0.35rem 0.25rem;
+    min-height: 2.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .rdp-day {
+    font-size: 0.85rem;
+  }
+
+  .rdp-head_cell,
+  .rdp-cell {
+    padding: 0.15rem;
+  }
+
+  .rdp-caption_dropdowns {
+    width: 100%;
+    gap: 0.5rem;
+  }
+}
+
 @media (max-width: 640px) {
   .rdp {
     font-size: 0.9rem;
