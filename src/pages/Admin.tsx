@@ -128,7 +128,6 @@ export default function Admin() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
-          <p className="mt-1 text-muted-foreground">Manage users and permissions</p>
         </div>
       </div>
 

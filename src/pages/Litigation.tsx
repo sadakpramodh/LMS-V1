@@ -498,9 +498,6 @@ export default function Litigation() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Litigation Management System</h1>
-          <p className="mt-1 text-muted-foreground">
-            Track court matters, monitor hearings, manage financial exposure, and view upcoming schedules in one place
-          </p>
         </div>
         <div className="flex gap-2">
           {hasPermission("upload_excel_litigation") && (
