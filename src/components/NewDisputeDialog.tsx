@@ -3,7 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Plus, Upload, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { addLocalDispute } from "@/lib/localData";
 
 const disputeSchema = z.object({
   company: z.string().min(1, "Company name is required").max(100),
@@ -106,30 +106,6 @@ export default function NewDisputeDialog() {
     setSelectedFiles(selectedFiles.filter((_, i) => i !== index));
   };
 
-  const uploadDocuments = async () => {
-    if (!user || selectedFiles.length === 0) return [];
-
-    const uploadedPaths: string[] = [];
-
-    for (const file of selectedFiles) {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-      const { error } = await supabase.storage
-        .from("documents")
-        .upload(fileName, file);
-
-      if (error) {
-        console.error("Upload error:", error);
-        throw error;
-      }
-
-      uploadedPaths.push(fileName);
-    }
-
-    return uploadedPaths;
-  };
-
   const onSubmit = async (data: DisputeFormValues) => {
     if (!user) {
       toast({
@@ -142,14 +118,11 @@ export default function NewDisputeDialog() {
 
     setUploading(true);
     try {
-      // Upload documents if any
-      const documentPaths = await uploadDocuments();
-      
-      // Insert dispute into database
-      const { error: insertError } = await supabase
-        .from("disputes")
-        .insert({
-          user_id: user.id,
+      const documentPaths = selectedFiles.map((file) => file.name);
+
+      addLocalDispute(
+        user.id,
+        {
           company: data.company,
           dispute_type: data.disputeType,
           value: parseFloat(data.value),
@@ -158,15 +131,17 @@ export default function NewDisputeDialog() {
           reply_due_date: data.replyDueDate,
           responsible_user: data.responsibleUser,
           description: data.description || null,
-          document_paths: documentPaths,
           status: "Pending",
-        });
+          document_paths: documentPaths,
+        },
+        documentPaths
+      );
 
-      if (insertError) throw insertError;
-      
       toast({
         title: "Dispute Created",
-        description: `The new dispute has been added successfully${documentPaths.length > 0 ? ` with ${documentPaths.length} document(s)` : ""}.`,
+        description: `The new dispute has been saved${
+          documentPaths.length > 0 ? ` with ${documentPaths.length} attachment(s)` : ""
+        } on this device.`,
       });
       
       setOpen(false);
