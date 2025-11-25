@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +7,12 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, User } from "lucide-react";
+import {
+  getStoredAlertSettings,
+  getStoredProfile,
+  updateStoredAlertSettings,
+  updateStoredProfile,
+} from "@/lib/localData";
 
 const Settings = () => {
   const { user } = useAuth();
@@ -26,39 +31,17 @@ const Settings = () => {
     whatsapp_number: "",
   });
 
-  type ProfileRow = {
-    full_name: string | null;
-    avatar_url: string | null;
-  };
-
-  type AlertSettingsRow = {
-    email_alerts: boolean;
-    whatsapp_alerts: boolean;
-    whatsapp_number: string | null;
-  };
-
   const loadProfile = useCallback(async () => {
     if (!user?.id) {
       return;
     }
 
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("full_name, avatar_url")
-        .eq("id", user.id)
-        .maybeSingle<ProfileRow>();
-
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
-        setProfile({
-          full_name: data.full_name ?? "",
-          avatar_url: data.avatar_url ?? "",
-        });
-      }
+      const stored = getStoredProfile(user.id);
+      setProfile({
+        full_name: stored?.full_name ?? user.full_name ?? "",
+        avatar_url: stored?.avatar_url ?? "",
+      });
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to load profile";
@@ -68,7 +51,7 @@ const Settings = () => {
         variant: "destructive",
       });
     }
-  }, [toast, user?.id]);
+  }, [toast, user?.full_name, user?.id]);
 
   const loadAlertSettings = useCallback(async () => {
     if (!user?.id) {
@@ -76,23 +59,12 @@ const Settings = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("alert_settings")
-        .select("email_alerts, whatsapp_alerts, whatsapp_number")
-        .eq("user_id", user.id)
-        .maybeSingle<AlertSettingsRow>();
-
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
-        setAlertSettings({
-          email_alerts: data.email_alerts,
-          whatsapp_alerts: data.whatsapp_alerts,
-          whatsapp_number: data.whatsapp_number ?? "",
-        });
-      }
+      const stored = getStoredAlertSettings(user.id);
+      setAlertSettings({
+        email_alerts: stored.email_alerts,
+        whatsapp_alerts: stored.whatsapp_alerts,
+        whatsapp_number: stored.whatsapp_number ?? "",
+      });
     } catch (error: unknown) {
       const message =
         error instanceof Error
@@ -121,26 +93,18 @@ const Settings = () => {
 
     setUploading(true);
     try {
-      const fileExt = file.name.split(".").pop() ?? "png";
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
 
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(fileName);
-
-      const publicUrl = publicUrlData.publicUrl;
-
-      if (!publicUrl) {
-        throw new Error("Failed to retrieve avatar URL");
-      }
-
-      setProfile((previous) => ({ ...previous, avatar_url: publicUrl }));
+      setProfile((previous) => ({ ...previous, avatar_url: dataUrl }));
+      updateStoredProfile(user.id, {
+        ...profile,
+        avatar_url: dataUrl,
+      });
 
       toast({
         title: "Success",
@@ -171,15 +135,7 @@ const Settings = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: profile.full_name,
-          avatar_url: profile.avatar_url,
-        })
-        .eq("id", user.id);
-
-      if (error) throw error;
+      updateStoredProfile(user.id, profile);
 
       toast({
         title: "Success",
@@ -210,16 +166,7 @@ const Settings = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("alert_settings")
-        .update({
-          email_alerts: alertSettings.email_alerts,
-          whatsapp_alerts: alertSettings.whatsapp_alerts,
-          whatsapp_number: alertSettings.whatsapp_number,
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      updateStoredAlertSettings(user.id, alertSettings);
 
       toast({
         title: "Success",

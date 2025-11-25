@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useToast } from "./use-toast";
+import {
+  getLocalDisputes,
+  removeLocalDispute,
+  updateLocalDisputeStatus,
+} from "@/lib/localData";
 
 export type Dispute = {
   id: string;
@@ -35,14 +39,8 @@ export function useDisputes() {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("disputes")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .returns<Dispute[]>();
-
-      if (error) throw error;
-      setDisputes(data ?? []);
+      const localDisputes = getLocalDisputes(user.id);
+      setDisputes(localDisputes);
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to fetch disputes";
@@ -58,11 +56,10 @@ export function useDisputes() {
 
   const deleteDispute = async (id: string) => {
     try {
-      const { error } = await supabase.from("disputes").delete().eq("id", id);
+      if (!user?.id) return;
 
-      if (error) throw error;
-
-      setDisputes((previous) => previous.filter((dispute) => dispute.id !== id));
+      const updated = removeLocalDispute(user.id, id);
+      setDisputes(updated);
       toast({
         title: "Dispute Deleted",
         description: "The dispute has been deleted successfully.",
@@ -80,18 +77,10 @@ export function useDisputes() {
 
   const updateDisputeStatus = async (id: string, status: string) => {
     try {
-      const { error } = await supabase
-        .from("disputes")
-        .update({ status })
-        .eq("id", id);
+      if (!user?.id) return;
 
-      if (error) throw error;
-
-      setDisputes((previous) =>
-        previous.map((dispute) =>
-          dispute.id === id ? { ...dispute, status } : dispute
-        )
-      );
+      const updated = updateLocalDisputeStatus(user.id, id, status);
+      setDisputes(updated);
       toast({
         title: "Status Updated",
         description: "The dispute status has been updated successfully.",
@@ -116,7 +105,6 @@ export function useDisputes() {
 
     void fetchDisputes();
 
-    // Listen for dispute creation events
     const handleDisputeCreated = () => {
       void fetchDisputes();
     };
@@ -125,28 +113,10 @@ export function useDisputes() {
       window.addEventListener("disputeCreated", handleDisputeCreated);
     }
 
-    // Set up realtime subscription
-    const channel = supabase
-      .channel("disputes-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "disputes",
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          void fetchDisputes();
-        }
-      )
-      .subscribe();
-
     return () => {
       if (typeof window !== "undefined") {
         window.removeEventListener("disputeCreated", handleDisputeCreated);
       }
-      void supabase.removeChannel(channel);
     };
   }, [fetchDisputes, user?.id]);
 
