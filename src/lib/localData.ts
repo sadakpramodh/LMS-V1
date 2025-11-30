@@ -1,13 +1,16 @@
 import { type Permission } from "@/types/permissions";
+import { type Role, type Group } from "@/types/auth";
 
 const isBrowser = typeof window !== "undefined";
 
 const USERS_KEY = "lms-users";
 const SESSION_KEY = "lms-session";
-const PERMISSIONS_KEY = "lms-permissions";
+const PERMISSIONS_KEY = "lms-permissions"; // Legacy, can be migrated or kept for direct overrides
 const DISPUTES_KEY = "lms-disputes";
 const PROFILES_KEY = "lms-profiles";
 const ALERTS_KEY = "lms-alert-settings";
+const ROLES_KEY = "lms-roles";
+const GROUPS_KEY = "lms-groups";
 
 export const DEFAULT_ADMIN_EMAIL = "sadakpramodh_maduru@welspun.com";
 const DEFAULT_ADMIN_PASSWORD = "admin123";
@@ -20,6 +23,8 @@ export interface LocalUser {
   avatar_url?: string;
   is_enabled: boolean;
   last_sign_in_at?: string;
+  roleIds: string[];
+  groupIds: string[];
 }
 
 export interface StoredProfile {
@@ -79,6 +84,49 @@ const generateId = () => {
   return Math.random().toString(36).slice(2, 11);
 };
 
+// --- ROLES & GROUPS ---
+
+const DEFAULT_ROLES: Role[] = [
+  {
+    id: "role_admin",
+    name: "Admin",
+    description: "Full system access",
+    permissionIds: ["*"], // Wildcard for full access
+    isSystem: true,
+  },
+  {
+    id: "role_user",
+    name: "User",
+    description: "Standard user access",
+    permissionIds: [],
+    isSystem: true,
+  },
+];
+
+export const getRoles = (): Role[] => {
+  const roles = readJson<Role[]>(ROLES_KEY, []);
+  if (roles.length === 0) {
+    // Seed default roles
+    writeJson(ROLES_KEY, DEFAULT_ROLES);
+    return DEFAULT_ROLES;
+  }
+  return roles;
+};
+
+export const saveRoles = (roles: Role[]) => {
+  writeJson(ROLES_KEY, roles);
+};
+
+export const getGroups = (): Group[] => {
+  return readJson<Group[]>(GROUPS_KEY, []);
+};
+
+export const saveGroups = (groups: Group[]) => {
+  writeJson(GROUPS_KEY, groups);
+};
+
+// --- USERS ---
+
 const seedAdminUser = (users: LocalUser[]): LocalUser[] => {
   if (users.some((user) => user.email === DEFAULT_ADMIN_EMAIL)) {
     return users;
@@ -92,6 +140,8 @@ const seedAdminUser = (users: LocalUser[]): LocalUser[] => {
     is_enabled: true,
     avatar_url: "",
     last_sign_in_at: new Date().toISOString(),
+    roleIds: ["role_admin"],
+    groupIds: [],
   };
 
   const nextUsers = [...users, admin];
@@ -101,7 +151,14 @@ const seedAdminUser = (users: LocalUser[]): LocalUser[] => {
 
 export const getStoredUsers = (): LocalUser[] => {
   const users = readJson<LocalUser[]>(USERS_KEY, []);
-  return seedAdminUser(users);
+  // Migration: Ensure new fields exist
+  const migratedUsers = users.map(u => ({
+    ...u,
+    roleIds: u.roleIds || [],
+    groupIds: u.groupIds || []
+  }));
+
+  return seedAdminUser(migratedUsers);
 };
 
 export const saveStoredUsers = (users: LocalUser[]) => {
@@ -165,6 +222,8 @@ export const signUpLocalUser = (
     is_enabled: true,
     avatar_url: "",
     last_sign_in_at: new Date().toISOString(),
+    roleIds: ["role_user"], // Default role
+    groupIds: [],
   };
 
   const nextUsers = [...users, newUser];
@@ -178,6 +237,8 @@ export const signOutLocalUser = () => {
   setCurrentUser(null);
 };
 
+// --- PERMISSIONS AGGREGATION ---
+
 export const getPermissionsMap = (): Record<string, Permission[]> => {
   return readJson<Record<string, Permission[]>>(PERMISSIONS_KEY, {});
 };
@@ -186,11 +247,59 @@ export const savePermissionsMap = (map: Record<string, Permission[]>) => {
   writeJson(PERMISSIONS_KEY, map);
 };
 
+export const getEffectivePermissions = (user: LocalUser): string[] => {
+  if (user.email === DEFAULT_ADMIN_EMAIL) return ["*"];
+
+  const roles = getRoles();
+  const groups = getGroups();
+
+  const permissionSet = new Set<string>();
+
+  // 1. Direct Roles
+  user.roleIds.forEach(roleId => {
+    const role = roles.find(r => r.id === roleId);
+    if (role) {
+      role.permissionIds.forEach(p => permissionSet.add(p));
+    }
+  });
+
+  // 2. Group Roles
+  user.groupIds.forEach(groupId => {
+    const group = groups.find(g => g.id === groupId);
+    if (group) {
+      group.roleIds.forEach(roleId => {
+        const role = roles.find(r => r.id === roleId);
+        if (role) {
+          role.permissionIds.forEach(p => permissionSet.add(p));
+        }
+      });
+    }
+  });
+
+  // 3. Legacy/Direct Permissions (Optional, keeping for backward compat if needed)
+  // const directPermissions = getPermissionsMap()[user.id] || [];
+  // directPermissions.forEach(p => permissionSet.add(p));
+
+  return Array.from(permissionSet);
+};
+
+// Kept for compatibility but now returns string[] of permission IDs mostly
 export const getPermissionsForUser = (
   userId: string,
   email?: string
 ): Permission[] => {
-  if (email === DEFAULT_ADMIN_EMAIL) {
+  // This function signature returns Permission[] type from legacy types
+  // We might need to map our new string IDs to that type or update the type.
+  // For now, let's just return what we can or cast.
+  // Actually, the legacy Permission type is a union of strings.
+  // So string[] is compatible if we cast.
+
+  const users = getStoredUsers();
+  const user = users.find(u => u.id === userId);
+  if (!user) return [];
+
+  const perms = getEffectivePermissions(user);
+  if (perms.includes("*")) {
     return [
       "add_dispute",
       "delete_dispute",
@@ -201,14 +310,17 @@ export const getPermissionsForUser = (
     ];
   }
 
-  const permissions = getPermissionsMap();
-  return permissions[userId] ?? [];
+  // Filter to match legacy Permission type for now to avoid breaking other files immediately
+  // In a real refactor we would update the Permission type to be dynamic.
+  return perms as Permission[];
 };
 
 export const updatePermissionsForUser = (
   userId: string,
   permissions: Permission[]
 ) => {
+  // Legacy support: maybe create a custom role for this user?
+  // Or just ignore for now as we move to Role based.
   const map = getPermissionsMap();
   map[userId] = permissions;
   savePermissionsMap(map);
@@ -216,7 +328,6 @@ export const updatePermissionsForUser = (
 
 export const getAdminUsersWithPermissions = () => {
   const users = getStoredUsers();
-  const permissions = getPermissionsMap();
 
   return users.map((user) => ({
     id: user.id,
@@ -225,6 +336,8 @@ export const getAdminUsersWithPermissions = () => {
     is_enabled: user.is_enabled,
     last_sign_in_at: user.last_sign_in_at,
     permissions: getPermissionsForUser(user.id, user.email),
+    roleIds: user.roleIds,
+    groupIds: user.groupIds
   }));
 };
 

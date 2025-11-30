@@ -12,6 +12,9 @@ import Litigation from "./pages/Litigation";
 import Arbitration from "./pages/Arbitration";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
+import RolesManagement from "./pages/Admin/RolesManagement";
+import GroupsManagement from "./pages/Admin/GroupsManagement";
+import UserManagement from "./pages/Admin/UserManagement";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -82,6 +85,36 @@ const App = () => (
                 <ProtectedRoute>
                   <Layout>
                     <Admin />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/roles"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <RolesManagement />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/groups"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <GroupsManagement />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <UserManagement />
                   </Layout>
                 </ProtectedRoute>
               }

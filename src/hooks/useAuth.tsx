@@ -14,6 +14,7 @@ import {
   signUpLocalUser,
   type LocalUser,
   getStoredProfile,
+  getEffectivePermissions,
 } from "@/lib/localData";
 
 type AuthError = { message: string };
@@ -31,6 +32,8 @@ interface AuthUser {
   avatar_url?: string;
   is_enabled: boolean;
   last_sign_in_at?: string;
+  permissions: string[];
+  roleIds: string[];
 }
 
 interface AuthContextType {
@@ -45,9 +48,12 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   loading: boolean;
+  hasPermission: (permissionId: string) => boolean;
 }
 
-const mapProfile = (user: LocalUser, profile: UserProfile | null): UserProfile => {
+import { type StoredProfile } from "@/lib/localData";
+
+const mapProfile = (user: LocalUser, profile: StoredProfile | null): UserProfile => {
   if (user.email === DEFAULT_ADMIN_EMAIL) {
     return {
       full_name: profile?.full_name ?? user.full_name ?? user.email,
@@ -58,13 +64,14 @@ const mapProfile = (user: LocalUser, profile: UserProfile | null): UserProfile =
 
   return {
     full_name: profile?.full_name ?? user.full_name ?? user.email,
-    is_enabled: profile?.is_enabled ?? user.is_enabled,
+    is_enabled: user.is_enabled, // StoredProfile doesn't have is_enabled, rely on user object
     avatar_url: profile?.avatar_url ?? user.avatar_url,
   };
 };
 
 const normalizeUser = (user: LocalUser | null): AuthUser | null => {
   if (!user) return null;
+  const permissions = getEffectivePermissions(user);
   return {
     id: user.id,
     email: user.email,
@@ -72,6 +79,8 @@ const normalizeUser = (user: LocalUser | null): AuthUser | null => {
     avatar_url: user.avatar_url,
     is_enabled: user.is_enabled,
     last_sign_in_at: user.last_sign_in_at,
+    permissions,
+    roleIds: user.roleIds,
   };
 };
 
@@ -131,6 +140,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     applyUser(current);
   };
 
+  const hasPermission = useCallback((permissionId: string) => {
+    if (!user) return false;
+    if (user.permissions.includes("*")) return true;
+    return user.permissions.includes(permissionId);
+  }, [user]);
+
   const contextValue: AuthContextType = {
     user,
     profile,
@@ -139,6 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signOut,
     refreshProfile,
     loading,
+    hasPermission,
   };
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
@@ -151,3 +167,4 @@ export const useAuth = () => {
   }
   return context;
 };
+
